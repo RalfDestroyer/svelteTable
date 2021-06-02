@@ -11,7 +11,7 @@
     import Select, { Option } from "@smui/select";
     import IconButton from "@smui/icon-button";
     import { Label } from "@smui/common";
-    import LinearProgress from '@smui/linear-progress';
+    import LinearProgress from "@smui/linear-progress";
 
     let displayColumns: any[] = [];
     let rowsPerPage = 10;
@@ -19,18 +19,21 @@
     let totalItems = 0;
     let items = [];
     let isFinishedLoading = false;
+    let sort = "deviceId";
+    let sortDirection = "ascending";
 
     $: start = currentPage * rowsPerPage;
     $: end = Math.min(start + rowsPerPage, totalItems);
     $: lastPage = Math.max(Math.ceil(totalItems / rowsPerPage) - 1, 0);
 
-    $: if (currentPage > lastPage) {
-        currentPage = lastPage;
-    }
+    $: if (currentPage > lastPage) currentPage = lastPage;
+
+    $: console.log(sort);
+    $: console.log(sortDirection);
+
 
     $: getDevices(currentPage, rowsPerPage).then((resp) => {
         if (resp) items = resp.items;
-        isFinishedLoading = true;
     });
 
     const instance = new Http(
@@ -40,7 +43,6 @@
 
     onMount(async () => {
         const resp = await getDevices(0, rowsPerPage);
-        isFinishedLoading = true;
         if (!resp) return;
 
         displayColumns = createDisplayColumns(resp.items);
@@ -53,20 +55,45 @@
         else return [];
     };
 
-    const getDevices = (page: number, size: number): Promise<any> => {
+    const getDevices = async (page: number, size: number): Promise<any> => {
         isFinishedLoading = false;
-        return instance.get("/devices", {
+        const resp = await instance.get("/devices", {
             page: page,
             size: size,
         });
+        isFinishedLoading = true;
+        return resp;
+    };
+
+    const handleSort = (): void => {
+        console.log("im sorted");
+        items.sort((a, b) => {
+            const [aVal, bVal] = [a[sort], b[sort]][
+                sortDirection === "ascending" ? "slice" : "reverse"
+            ]();
+            if (typeof aVal === "string") {
+                return aVal.localeCompare(bVal);
+            }
+            return aVal - bVal;
+        });
+        items = items;
     };
 </script>
 
-<DataTable stickyHeader table$aria-label="Todo list" style="width: 100%;">
+<DataTable
+    stickyHeader
+    sortable
+    bind:sort
+    bind:sortDirection
+    on:MDCDataTable:sorted={handleSort}
+    table$aria-label="Devices list"
+    style="width: 100%;"
+>
     <Head>
         <Row>
             {#each displayColumns as column, i (i)}
-                <Cell>{column}</Cell>
+                <Cell columnId="{column}">{column}</Cell>
+                <!-- <IconButton class="material-icons">arrow_upward</IconButton> -->
             {/each}
         </Row>
     </Head>
@@ -132,4 +159,14 @@
 </DataTable>
 
 <style>
+    /* Reset some of the demo app styles that interfere. */
+    :global(html) {
+        height: auto;
+        width: auto;
+        position: static;
+    }
+    :global(#sapper, body) {
+        display: block;
+        height: auto;
+    }
 </style>
